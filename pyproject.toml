@@ -1,0 +1,43 @@
+# Setup file to instantiate installation of package from command line. setup.py is deprecated
+
+# Update file with new version every time it is updated:
+# - version="1.0.0" -> version="1.0.1" for a small change that patches bugs that do not alter compatability
+# - version="1.0.0" -> version="1.1.0" for a minor change that adds new features but does not break compatability
+# - version="1.0.0" -> version="2.0.0" for a major change that breaks compatability with the previous version
+
+[build-system]
+requires = ["setuptools>=72.1.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project]
+name = "hot_deck_imputer"
+version = "1.0.0"
+description = "A package to conduct hot deck imputation using polars"
+authors = [{name = "Jameson Carter", email = "jamcarter@urban.org" }]
+readme = "README.md"
+requires-python = '>=3.12.4'
+license = { text = "MIT" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "colorama == 0.4.6",
+    "iniconfig == 2.0.0",
+    "numpy == 2.0.1",
+    "packaging == 24.1",
+    "pandas == 2.2.2",
+    "pluggy == 1.5.0",
+    "pyarrow == 17.0.0",
+    "python-dateutil == 2.9.0.post0",
+    "pytz == 2024.1",
+    "six == 1.16.0",
+    "tzdata == 2024.1"
+]
+
+[project.urls]
+Homepage = "https://github.com/UI-Research/RreadFEH/feh_io"
