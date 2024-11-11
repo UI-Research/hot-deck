@@ -13,6 +13,8 @@ This module defines classes that can be used to edit those functionalities.
 """
 import numpy as np
 import polars as pl
+import itertools
+from statsmodels.stats.weightstats import DescrStatsW
 
 class HotDeckImputer:
     def __init__(self, donor_data:pl.DataFrame, 
@@ -185,7 +187,7 @@ class HotDeckImputer:
             }
 
             # Convert dictionary to DataFrame
-            stats_df = pd.DataFrame(data)
+            stats_df = pl.DataFrame(data)
             stats_df['diff'] = stats_df['imp'] - stats_df['donor']
             stats_df['imp_to_donor_ratio'] = stats_df['imp']/stats_df['donor']
 
@@ -201,14 +203,14 @@ class HotDeckImputer:
         data = self.summarize_cells()
 
         # Create an Excel writer
-        with pd.ExcelWriter(f'{out_path}/{out_file}.xlsx') as writer:
+        with pl.ExcelWriter(f'{out_path}/{out_file}.xlsx') as writer:
             # Set a starting row variable to track where to place data in the single sheet
             start_row = 0
             
             # Loop over each cell's data
             for key, df in data.items():
                 # Write a separator row with the key as a label
-                separator = pd.DataFrame([['cell', key]], columns=['statistic', 'donor'])
+                separator = pl.DataFrame([['cell', key]], columns=['statistic', 'donor'])
                 separator.to_excel(writer, sheet_name='cells', index=False, header=False, startrow=start_row)
                 
                 # Move start_row down by 1 to allow space after the separator
@@ -281,7 +283,7 @@ class HotDeckImputer:
 
         # Store the variation standard deviation parameter
         self.random_noise = variation_stdev
-        self.recipient_data = pd.concat(imputed_recipient_cells)
+        self.recipient_data = pl.concat(imputed_recipient_cells)
         
         return
 
@@ -365,6 +367,6 @@ class HotDeckImputer:
                 imputed_recipient_cells.append(recipient_cell)
 
         # Combine all the imputed recipient cells into one DataFrame
-        self.recipient_data = pd.concat(imputed_recipient_cells)
+        self.recipient_data = pl.concat(imputed_recipient_cells)
 
         return
