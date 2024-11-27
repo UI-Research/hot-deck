@@ -374,6 +374,35 @@ class HotDeckImputer:
 
         return summary_stats
 
+
+    '''TODO: convert into a plotting method to see the imputed values vs. donor values
+    import seaborn as sns 
+    import matplotlib.pyplot as plt
+
+    # Compare the input to the output in the process
+    plot_data = imputer.recipient_data[['perwt','imp_liquid_assets']]
+    plot_data_donor = imputer.donor_data[['perwt','liquid_assets']]
+    plot_data['log_liquid_assets'] = np.log(plot_data['imp_liquid_assets'])
+    plot_data_donor['log_liquid_assets'] = np.log(plot_data_donor['liquid_assets'])
+
+    # Create a weighted histogram plot for donor data
+    sns.kdeplot(data=plot_data_donor, x='log_liquid_assets', weights='perwt', color='green', label='Donor', alpha=0.5)
+
+    # Create a weighted histogram plot for recipient data
+    sns.kdeplot(data=plot_data, x='log_liquid_assets', weights='perwt', color='blue', label='Recipient', alpha=0.5)
+
+    # Add titles and labels
+    plt.title('Logged liquid assets post noise injection')
+    plt.xlabel('Logged Liquid Assets Value')
+    plt.ylabel('Weighted Density')
+
+    # Add a legend to differentiate between recipient and donor data
+    plt.legend()
+
+    # Show the plot
+    plt.show()
+    '''
+    
     def age_dollar_amounts(self, donor_year_cpi, imp_year_cpi):
         """
         Age the imputed values to the target year. Relevant when the source data and target data differ.
