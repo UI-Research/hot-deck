@@ -1,20 +1,13 @@
 """
-Class defining DYNASIM-FEH file reader.
-
-DYNASIM FEH produces three files:
-
-    - header file,
-    - family file, and
-    - person file.
-
-
-read_feh and save_feh modules define functionality for accessing, processing, and writing files.
-This module defines classes that can be used to edit those functionalities.
+Class defining HotDeckImputer for imputing missing values in recipient data using donor data.
 """
 import numpy as np
 import polars as pl
 import itertools
 from statsmodels.stats.weightstats import DescrStatsW
+from xlsxwriter import Workbook
+import os
+import error_detection 
 
 class HotDeckImputer:
     def __init__(self, donor_data:pl.DataFrame, 
@@ -36,13 +29,64 @@ class HotDeckImputer:
 
         # Random noise attributes defined in methods
         self.random_noise = None
+
+        # Validate input data
+        self._validate_data()
+
+    def _validate_data(self):
+        """
+        Validate the input data and parameters.
+        """
+        error_detection.validate_data(self)
+        return
+            
+    def _check_variable_consistency(self, variables:list):
+        """
+        Non-callable method to check if the unique values and types of the variables
+        used for cell definition are the same in donor and recipient datasets.
+        :param variables: List of variables to check
+        :raises TypeError: If data types do not match between donor and recipient
+        :raises ValueError: If unique values do not match between donor and recipient
+        """
+        error_detection.check_variable_consistency(self, variables)
+        return
     
-    def take_cell_definitions(self, cell_definitions):
+    def _parse_condition(self, condition:str):
         """
-        Method to accept cell definitions.
-        :param cell_definitions: A list of conditions for defining cells
+        Parse a condition string and return a Polars expression.
+        :param condition: The condition string to parse.
+        :type condition: str
+        :return: The Polars expression.
+        :rtype: pl.Expr
+        :raises: None
         """
-        self.cell_definitions = cell_definitions
+        # Remove outer parentheses
+        condition = condition.strip("()")
+        
+        # Split the condition into individual criteria
+        criteria = condition.split(" & ")
+        
+        # Initialize combined expression with a default "true" condition
+        combined_expression = pl.lit(True)
+        
+        # Parse each criterion and combine them using logical AND
+        for criterion in criteria:
+            # Remove any extra parentheses and spaces
+            criterion = criterion.strip("()").strip()
+            column, value = criterion.split("==")
+            column = column.strip()
+            value = value.strip().strip("'")
+            # Detect the type of the value
+            if value.isdigit():
+                value = int(value)
+            elif value.replace('.', '', 1).isdigit():
+                value = float(value)
+            expr = pl.col(column) == value
+            # Combine the expressions
+            print(expr)
+            combined_expression &= expr
+        
+        return combined_expression
 
     def generate_cells(self):
         """
@@ -58,34 +102,16 @@ class HotDeckImputer:
         
         for i, condition in enumerate(self.cell_definitions):
             # Create cell based on condition
-            donor_cells[f'{condition}'] = self.donor_data.query(condition)
-            recipient_cells[f'{condition}'] = self.recipient_data.query(condition)
-        
+            filter_expr = self._parse_condition(condition)
+            # Filter the donor and recipient data based on the condition
+            donor_cells[f'{condition}'] = self.donor_data.filter(filter_expr)
+            recipient_cells[f'{condition}'] = self.recipient_data.filter(filter_expr)
+
         self.donor_cells = donor_cells
         self.recipient_cells = recipient_cells
         return
     
-    def _check_variable_consistency(self, variables):
-        """
-        Non-callable method to check if the unique values and types of the variables
-        are the same in donor and recipient datasets.
-        :param variables: List of variables to check
-        :raises TypeError: If data types do not match between donor and recipient
-        :raises ValueError: If unique values do not match between donor and recipient
-        """
-        for var in variables:
-            donor_unique = self.donor_data[var].unique()
-            recipient_unique = self.recipient_data[var].unique()
-
-            # Check if the types match
-            if self.donor_data[var].dtype != self.recipient_data[var].dtype:
-                raise TypeError(f"Data types for variable '{var}' do not match between donor and recipient datasets.")
-            
-            # Check if the unique values match
-            if set(donor_unique) != set(recipient_unique):
-                raise ValueError(f"Unique values for variable '{var}' do not match between donor and recipient datasets.")
-
-    def define_cells(self, variables):
+    def define_cells(self, variables:list):
         """
         Method to define all possible cell definitions given a list of input variables.
         :param variables: A list of column names (variables) from the data to partition by.
@@ -105,7 +131,7 @@ class HotDeckImputer:
         cell_definitions = []
         for combination in var_combinations:
             conditions = [
-            f"({variables[i]} == '{combination[i]}')" if isinstance(combination[i], str) else f"({variables[i]} == {combination[i]})"
+            f"{variables[i]} == '{combination[i]}'" if isinstance(combination[i], str) else f"{variables[i]} == {combination[i]}"
             for i in range(len(combination))
             ]
             cell_definitions.append(' & '.join(conditions))
@@ -113,51 +139,60 @@ class HotDeckImputer:
         self.cell_definitions = cell_definitions
         return 
 
-    def split_cell(self, cell_condition, split_condition):
+    def split_cell(self, cell_condition:str, split_column:str):
         """
         Method to split an individual cell further based on a new condition.
-        :param cell: Dataframe representing the cell to be split
-        :param split_condition: A condition string to further split the cell.
-        :return: Two dataframes representing the split
+        :param cell_condition: A condition string representing the cell to be split.
+        :param split_column: The column to check for unique values to split the cell.
+        :return: None
         """
-        # combine conditions together
-        combined_condition = f'{cell_condition} & {split_condition}'
-        combined_not_condition = f'{cell_condition} & not {split_condition}'
-        
-        # get the data for cells that are going to be split
+        # Get the data for the cell that is going to be split
         split_donor = self.donor_cells[cell_condition]
         split_recipient = self.recipient_cells[cell_condition]
-
+        
+        # Get unique values in the split column
+        unique_values = split_donor.select(split_column).unique().to_series().to_list()
+        
         # Remove the original cell from the donor and recipient cell dictionaries
         del self.donor_cells[cell_condition]
         del self.recipient_cells[cell_condition]
 
-        # Add the newly split cells into the dictionaries
-        self.donor_cells[combined_condition] = split_donor.query(combined_condition)
-        self.donor_cells[combined_not_condition] = split_donor.query(combined_not_condition)
-
-        self.recipient_cells[combined_condition] = split_recipient.query(combined_condition)
-        self.recipient_cells[combined_not_condition] = split_recipient.query(combined_not_condition)
-
-        # Update cell definitions
+        # Split the cell based on unique values in the split column
+        for value in unique_values:
+            split_condition = f"{split_column} == {value}"
+            combined_condition = f"{cell_condition} & {split_condition}"
+            split_expr = self._parse_condition(combined_condition)
+            
+            # Add the newly split cells into the dictionaries
+            self.donor_cells[combined_condition] = split_donor.filter(split_expr)
+            self.recipient_cells[combined_condition] = split_recipient.filter(split_expr)
+            
+            # Update cell definitions
+            self.cell_definitions.append(combined_condition)
+        
+        # Remove the original cell condition from cell definitions
         self.cell_definitions.remove(cell_condition)
-        self.cell_definitions.append(combined_condition)
-        self.cell_definitions.append(combined_not_condition)
-        return 
+        return
     
     def summarize_cells(self):
         results = {}
         for i, recipient_cell in self.recipient_cells.items():
 
-            ### Donor cell + source variable
-            donor_cell = self.donor_cells.get(i)
-            source_var = donor_cell[f'{self.imputation_var}'].copy()
-
             # Donor stat generation
-            donor_stats = DescrStatsW(source_var, weights=donor_cell[self.weight_var], ddof=0)
+            donor_cell = self.donor_cells.get(i)
+            source_var = donor_cell[self.imputation_var]
+
+            if self.weight_var in donor_cell.columns:
+                donor_stats = DescrStatsW(source_var, weights=donor_cell[self.weight_var], ddof=0)
+            else:
+                donor_stats = DescrStatsW(source_var, ddof=0)
+
             # Recipient stat generation
-            source_var = recipient_cell[f'imp_{self.imputation_var}'].copy()
-            recipient_stats = DescrStatsW(source_var, weights=recipient_cell[self.weight_var], ddof=0)
+            source_var = recipient_cell[f'imp_{self.imputation_var}']
+            if self.weight_var in recipient_cell.columns:
+                recipient_stats = DescrStatsW(source_var, weights=recipient_cell[self.weight_var], ddof=0)
+            else:
+                recipient_stats = DescrStatsW(source_var, ddof=0)
 
             data = {
                 'statistic': [
@@ -171,7 +206,7 @@ class HotDeckImputer:
                     donor_stats.var,                                 # Variance for donor
                     donor_stats.std_mean,                            # Std error for donor
                     donor_stats.sum_weights,                         # Weighted sum for donor
-                    donor_cell.shape[0]                              # Observations for donor
+                    np.float64(donor_cell.shape[0])                  # Observations for donor
                 ],
 
                 'imp': [
@@ -182,47 +217,57 @@ class HotDeckImputer:
                     recipient_stats.var,                                     # Variance for imp
                     recipient_stats.std_mean,                                # Std error for imp
                     recipient_stats.sum_weights,                             # Weighted sum for imp
-                    recipient_cell.shape[0]                                  # Observations for imp
+                    np.float64(recipient_cell.shape[0])                      # Observations for imp
                 ]
             }
 
             # Convert dictionary to DataFrame
             stats_df = pl.DataFrame(data)
-            stats_df['diff'] = stats_df['imp'] - stats_df['donor']
-            stats_df['imp_to_donor_ratio'] = stats_df['imp']/stats_df['donor']
-
-            # Remove scientific notation for clarity
-            numeric_cols = ['donor', 'imp', 'diff']
-            stats_df[numeric_cols] = stats_df[numeric_cols].applymap(lambda x: f"{x:,.2f}")
+            stats_df = stats_df.with_columns((stats_df['imp'] - stats_df['donor']).alias('diff'))
+            stats_df = stats_df.with_columns((stats_df['imp']/stats_df['donor']).alias('imp_to_donor_ratio'))
 
             results[i] = stats_df
 
         return results
 
-    def gen_analysis_file(self, out_file, out_path):
+    def gen_analysis_file(self, out_file:str, out_path:str =''):
+        """
+        Generate an analysis file summarizing the imputation results.
+        :param out_file (str): Name of the output file.
+        :param out_path (str): Path to save the output file.
+        :return: None
+        """
+        if out_path == '':
+            out_path = '.'
+        # Ensure the output directory exists
+        if not os.path.exists(out_path):
+            raise FileNotFoundError(f"The directory '{out_path}' does not exist.")
+
+        # Construct the full file path
+        full_path = os.path.join(out_path, f'{out_file}.xlsx')
+
+        # Get dictionary of DFs for each cell
         data = self.summarize_cells()
+        
+        # Get iterator for worksheet locations
+        row = 1
+        col = 0
 
-        # Create an Excel writer
-        with pl.ExcelWriter(f'{out_path}/{out_file}.xlsx') as writer:
-            # Set a starting row variable to track where to place data in the single sheet
-            start_row = 0
-            
-            # Loop over each cell's data
+        # Iterate through each cell's data
+        with Workbook(full_path) as wb:  
+            ws = wb.add_worksheet('Summary')
             for key, df in data.items():
-                # Write a separator row with the key as a label
-                separator = pl.DataFrame([['cell', key]], columns=['statistic', 'donor'])
-                separator.to_excel(writer, sheet_name='cells', index=False, header=False, startrow=start_row)
-                
-                # Move start_row down by 1 to allow space after the separator
-                start_row += 1
-                
-                # Write the actual DataFrame below the separator row
-                df.to_excel(writer, sheet_name='cells', startrow=start_row, index=False)
-                
-                # Move start_row down by the number of rows in the df plus an extra row for spacing
-                start_row += len(df) + 2
-
-        print(f"Cell data written to '{out_path}\{out_file}.xlsx'.")
+                ws.write(row-1, col, key)
+                # Write table to excel  
+                df.write_excel(workbook = wb, 
+                               worksheet = ws,
+                               position = (row, col),
+                               table_style="Table Style Light 1",
+                               autofit = True)
+            
+                # 2 row gap between each DF's results
+                row = row + df.shape[0] + 3
+        print(f"Cell data written to '{out_path}\\{out_file}.xlsx'.")
 
     def apply_random_noise(self, variation_stdev, floor_noise = None):
         """
@@ -236,14 +281,18 @@ class HotDeckImputer:
 
         for condition, donor_cell in self.donor_cells.items():
             # Sort donor cell by asset value
-            donor_cell = donor_cell.sort_values(by='liquid_assets').reset_index(drop=True)
+            donor_cell = donor_cell.sort(by=self.imputation_var)
 
             # Calculate the next neighbor values
-            donor_cell['next_val'] = donor_cell[f'{self.imputation_var}'].shift(-1)
+            donor_cell = donor_cell.with_columns(
+                donor_cell[self.imputation_var].shift(-1).alias('next_val')
+            )
 
             # Compute the distance to prior and next neighbor
-            donor_cell['next_distance'] = np.subtract(donor_cell['next_val'], donor_cell[f'{self.imputation_var}'])
-
+            donor_cell = donor_cell.with_columns(
+                (donor_cell['next_val'] - donor_cell[self.imputation_var]).alias('next_distance')
+            )
+            
             # Calculate the average neighbor distance for the cell, ignoring NaN values
             ## First get mean of each row and then get mean of the result
             mean_distance = donor_cell['next_distance'].mean()
@@ -253,13 +302,9 @@ class HotDeckImputer:
 
             # Calculate the threshold value based on relevant floor for asset tests
             if floor_noise is not None:
-                print(f'Cell:\n{condition}')
                 threshold = floor_noise
-                print(f'Min threshold for noise injection:\n{threshold}')
             else:
-                print(f'Cell:\n{condition}')
                 threshold = self.donor_data[f'{self.imputation_var}'].min()
-                print(f'Min threshold for noise injection:\n{threshold}')
 
             # Generate random noise for each recipient in the cell
             # Only apply this random noise for those who are less than some factor of the standard deviation of neighboring distances
@@ -269,18 +314,37 @@ class HotDeckImputer:
             # identify the observations who are above the threshold, who will have random noise added
             # when there is no thresholding by floor_stdev_multiplier, this is handled by the minimum identified above
             ge_thresh = recipient_cell[f'imp_{self.imputation_var}'] >= threshold
-            noise = np.random.normal(loc=0, scale=noise_stdev, size=ge_thresh.sum())
-            print(f'max noise: {noise.max()}, min noise: {noise.min()}')
+            noise = np.random.normal(loc=0, scale=noise_stdev, size=recipient_cell.shape[0])
+            
+            # Indicate to user that noise was not generated if all values are below the threshold
+            if ge_thresh.sum() == 0:
+                print(f'\nCell:\n{condition}')
+                print(f'NO NOISE GENERATED for cell due to thresholding.\n' 
+                        f'All values are below the threshold of {threshold}\n'
+                        f'Mean value of cell observations for imp_{self.imputation_var}: ' 
+                        f'{recipient_cell[f'imp_{self.imputation_var}'].mean()}')
 
             # Apply noise to the imputed liquid assets in the recipient cell
-            recipient_cell.loc[ge_thresh, f'imp_{self.imputation_var}'] += noise
-            min_donor_val = donor_cell[f'{self.imputation_var}'].min()
-            recipient_cell.loc[ge_thresh, f'imp_{self.imputation_var}'] = recipient_cell.loc[ge_thresh, f'imp_{self.imputation_var}'].clip(lower = min_donor_val) # ensure nobody is made to have negative values
+            recipient_cell = recipient_cell.with_columns(
+                pl.when(ge_thresh)
+                .then(pl.col(f'imp_{self.imputation_var}') + noise)
+                .otherwise(pl.col(f'imp_{self.imputation_var}'))
+                .alias(f'imp_{self.imputation_var}')
+            )
+
+            # Ensure that values that have noise applied are not below the minimum donor value
+            min_donor_val = donor_cell[self.imputation_var].min()
+            recipient_cell = recipient_cell.with_columns(
+                pl.col(f'imp_{self.imputation_var}')
+                .clip(lower_bound = min_donor_val)
+                .alias(f'imp_{self.imputation_var}')
+            )
 
             # Update recipient data with noisy values
-            self.recipient_cells[condition][f'imp_{self.imputation_var}'] = recipient_cell[f'imp_{self.imputation_var}']
+            self.recipient_cells[condition] = recipient_cell.with_columns(
+                pl.col(f'imp_{self.imputation_var}')
+            )
             imputed_recipient_cells.append(recipient_cell)
-
         # Store the variation standard deviation parameter
         self.random_noise = variation_stdev
         self.recipient_data = pl.concat(imputed_recipient_cells)
@@ -289,12 +353,12 @@ class HotDeckImputer:
 
     def summarize_column(self, data, column_name):
         """
-        Summarize a column in donor_data, returning basic statistics.
+        Summarize a column in data, returning basic statistics.
         :param column_name: The column to summarize
         :return: A dictionary with summary statistics
         """
         # Check if the column exists in the DataFrame
-        if column_name not in self.donor_data.columns:
+        if column_name not in data.columns:
             raise ValueError(f"Column '{column_name}' does not exist in donor_data.")
         
         # Calculate summary statistics
@@ -305,7 +369,7 @@ class HotDeckImputer:
             'max': data[column_name].max(),
             'std_dev': data[column_name].std(),
             'count': data[column_name].count(),
-            'missing_values': data[column_name].isna().sum()
+            'missing_values': data[column_name].is_null().sum()
         }
 
         return summary_stats
@@ -318,7 +382,10 @@ class HotDeckImputer:
         
         print(f'Summary of {self.imputation_var} pre CPI aging:\n{self.summarize_column(self.donor_data, self.imputation_var)}')
         scaling_factor = imp_year_cpi / donor_year_cpi
-        self.donor_data[self.imputation_var] *= scaling_factor
+
+        self.donor_data = self.donor_data.with_columns(
+            (pl.col(self.imputation_var) * scaling_factor).alias(self.imputation_var)
+        )
         print(f'Summary of {self.imputation_var} post CPI aging:\n{self.summarize_column(self.donor_data, self.imputation_var)}')
 
         return
@@ -335,36 +402,40 @@ class HotDeckImputer:
         imputed_recipient_cells = []
 
         # For each recipient cell, find the corresponding donor cell and perform imputation
-        for i, recipient_cell in self.recipient_cells.items():
-            donor_cell = self.donor_cells.get(i)
+        for condition, recipient_cell in self.recipient_cells.items():
+            donor_cell = self.donor_cells.get(condition)
             
-            if donor_cell is not None and not donor_cell.empty:
+            if donor_cell is not None and not donor_cell.shape[0] == 0:
                 # Perform weighted random selection for the required number of values
                 if self.weight_var:
-                    weights = donor_cell[self.weight_var].values
-                    donor_values = donor_cell[self.imputation_var].dropna().values
+                    weights = donor_cell[self.weight_var]
+                    donor_values = donor_cell[self.imputation_var].drop_nulls()
 
                     # Randomly select `missing_count` values from the donor set using the weights
                     # Using weighted selection according to probability proportional to weights https://documentation.sas.com/doc/en/statcdc/14.2/statug/statug_surveyimpute_details25.htm#statug.surveyimpute.weightedDet
                     selected_values = np.random.choice(donor_values, size=len(recipient_cell), replace=True, p=weights / weights.sum())
                 else:
                     # Without weights, simply sample donor values
-                    donor_values = donor_cell[self.imputation_var].dropna().values
+                    donor_values = donor_cell[self.imputation_var].drop_nulls()
                     selected_values = np.random.choice(donor_values, size=len(recipient_cell), replace=True)
 
-                # Set imputed var values
-                recipient_cell[f'imp_{self.imputation_var}'] = selected_values.copy()
+                # Add the imputed values to the recipient cell
+                recipient_cell = recipient_cell.with_columns(
+                    pl.Series(f'imp_{self.imputation_var}', selected_values)
+                )
                 # Add the imputed recipient cell to the list
                 imputed_recipient_cells.append(recipient_cell)
+                self.recipient_cells[condition] = recipient_cell.clone()
 
             else:
                 # If no donors are available, imputation is not performed (or can apply other fallback logic here)
-                print(f"No donors available for {i}, global mean applied")
+                print(f"No donors available for {condition}, global mean applied")
                 recipient_cell[f'imp_{self.imputation_var}'] = np.average(self.donor_data[self.imputation_var], 
                                                                           self.donor_data[self.weight_var])
 
                 # Add the imputed recipient cell to the list
                 imputed_recipient_cells.append(recipient_cell)
+                self.recipient_cell = recipient_cell.clone()
 
         # Combine all the imputed recipient cells into one DataFrame
         self.recipient_data = pl.concat(imputed_recipient_cells)
