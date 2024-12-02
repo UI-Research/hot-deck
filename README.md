@@ -1,66 +1,87 @@
-This repo contains R and Python code that reads the output of DYNASIM's Family and Earnings History (FEH) module. 
+## About
+This repo contains Python code that implements hot deck imputation using Polars dataframes. It generalizes methods that are possible
 
-## Python
+Hot deck imputation involves randomly sampling individuals to create data for rows missing information. In many microsimulation settings at Urban, this concept is applied across datasets as well, where information missing in one dataset is inferred from another dataset. The basic process is as follows:
 
-The Python reader is implemented in the module Python/read_feh.py. The function `read_feh_data_file()` is all that is needed for reading a DYNASIM file.
+* Define categorical cells that are avaialable in both datasets, for example race.
+* Divide the data into categories available in donor and source data.
+* Split specific cells further if desired.
+* Impute by randomly selecting observations from donor cells, and applying their values to recipients. 
+* Compare the data among donor and recipient cells to ensure that relevant characteristics translate well from donor data to recipient data.
 
-The following is a usage example:
-
+## Example Implementation in Python
+### Install the package 
+In the command line, do: `pip install git+https://github.com/UI-Research/hot-deck`
+### Generate data tracking asset values and race, sex, and work
 ```
-import Python.read_feh as feh
+from hot_deck_class import HotDeckImputer
+# Data where we know asset values, i.e. the 'donor'
+donor_data = {
+    'assets': [50000, 20000, 300000, 2000, 
+                     10000, 10000, 200, 2000, 4000, 500000],
+    'race_cell': ['Black','Black','Black','White','White',
+                     'White','Black','White','Black','Black'],
+    'sex_cell': ['M','F','F','M','F',
+                     'M','F','F','M','F'],
+    'work_cell': [1,0,1,0,1,
+                     0,1,1,1,0],
+    'weight': [1, 2, 1, 2, 1,
+               2, 1, 2, 1, 2]
+}
 
-header_file = 'C:/Users/dcosic/Documents/Dynasim/Dynasim-core/run/dynasipp_header_even.dat'
-person_file = 'C:/Users/dcosic/Documents/Dynasim/Dynasim-core/run/dynasipp_person_even.dat'
-family_file = 'C:/Users/dcosic/Documents/Dynasim/Dynasim-core/run/dynasipp_family_even.dat'
+donor_data = pl.DataFrame(donor_data)
 
-# Read 10 records from each person and family file
-perdata = feh.read_feh_data_file(header_file, person_file, file_type='person', count=10)
-famdata = feh.read_feh_data_file(header_file, family_file, file_type='family', count=10)
+# Data where we don't know asset values, i.e. the 'recipient'
+recipient_data = {
+    'race_cell': ['Black','Black','Black','White','White',
+                     'White','Black','White','Black','Black','Black','Black','White','White'],
+    'sex_cell': ['M','F','F','M','F',
+                     'M','F','F','M','F', 'F', 'M', 'M', 'F'],
+    'work_cell': [1,0,1,0,1,
+                     0,1,1,1,0,0,1,0,1],
+    'weight': [1, 3, 2, 3, 2,
+               1, 4, 2, 1, 3, 4, 2, 1, 1]
+}
 
+recipient_data = pl.DataFrame(recipient_data)
+```
+### Instantiate HotDeckImputer
+```
+imputer = HotDeckImputer(donor_data = donor_data, 
+                         imputation_var = 'assets', 
+                         weight_var = 'weight', 
+                         recipient_data = recipient_data)
 ```
 
-## R
-For the R reader, its main piece is the code in `read_codebook.R` that reads DYNASIM's codebook and constructs column names for the data frame. 
-
-DYNASIM codebook specifies the logical layout of the person and family records. A record generally includes so called *static* variables, which contain a single value, and *micro time-series*, which contain values for a range of years. For each variable on a record, the codebook specifies its name, starting position, and end position. For micro time-series, the codebook also specifies the year range.
-
-> [!IMPORTANT]
-> All variables are 32-bit integers. The values of starting and ending position of a variable are not used.
-
-A sample codebook is in `codebook_2087ds.sipp2006`. To obtain column names, execute the following code:
-
+### Age dollar amounts to align data collected in different years
 ```
-library(tidyverse)
-source("read_codebook.R")
-rec_struct <- get_col_names(paste0(here::here(), '/codebook_2087ds.sipp2006'))
+imputer.age_dollar_amounts(donor_year_cpi = 223.1, imp_year_cpi = 322.1)
 ```
 
-The `read_feh.R` file contains code that reads a DYNASIM output file, but this repo does not contain any sample output files.
+### Define cells according to race and sex
+```
+# Input as a list
+variables = ['race_cell','sex_cell']
+# Define every combination of race and sex, then partition data into cells
+imputer.define_cells(variables)
+imputer.generate_cells()
+# View the definitions
+imputer.cell_definitions
+```
 
-## Data
-
-### Sex
-
-Sex is encoded in variable SEX.
-
-* Men:   SEX==1
-* Women: SEX==2
-
-### Race and Ethnicity
-
-Race and ethnicity are encoded in variable ETHNCTY.
-
-* Asian:    4000 <= ETHNCTY <= 4999
-* Black:    2000 <= ETHNCTY <= 2999
-* Hispanic: 
-  * 1014 <= ETHNCTY <= 1020 or
-  * 2014 <= ETHNCTY <= 2020 or
-  * 3014 <= ETHNCTY <= 3020 or 
-  * 4014 <= ETHNCTY <= 4020
-* White:    1000 <= ETHNCTY <= 1999            
-* Other:    3000 <= ETHNCTY <= 3999
-
-### Education
-
-Educational attainment is encoded in the vector GRADECAT as the number of completed grades. It can take values from 0 to 18.
-
+### Split specific cells up where sample allows
+```
+imputer.split_cell("race_cell == 'Black' & sex_cell == 'F'", "work_cell")
+```
+### Impute data
+```
+imputer.impute()
+```
+### Add random noise to smooth the results
+```
+imputer.apply_random_noise(variation_stdev = (1/6), floor_noise = 1.5)
+```
+### Generate file comparing donor data vs. recipient data
+```
+imputer.gen_analysis_file('hot_deck_stats')
+```
