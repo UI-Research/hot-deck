@@ -7,7 +7,7 @@ import itertools
 from statsmodels.stats.weightstats import DescrStatsW
 from xlsxwriter import Workbook
 import os
-import hot_deck_imputer.error_detection 
+import hot_deck_imputer.error_detection as error_detection 
 
 class HotDeckImputer:
     def __init__(self, donor_data:pl.DataFrame, 
