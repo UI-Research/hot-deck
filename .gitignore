@@ -3,3 +3,4 @@
 /src/hot_deck_imputer.egg-info
 /hotdeck
 /src/hot-deck-imputer/__pycache__
+/tests/hot_deck_stats.xlsx

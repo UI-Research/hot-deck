@@ -56,6 +56,6 @@ if __name__ == '__main__':
     imputer.apply_random_noise(variation_stdev = (1/6), floor_noise = 1.5)
 
     # GENERATE ANALYSIS FILE
-    imputer.gen_analysis_file('hot_deck_stats')
+    imputer.gen_analysis_file('hot_deck_stats','tests')
 
 

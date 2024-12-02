@@ -83,7 +83,6 @@ class HotDeckImputer:
                 value = float(value)
             expr = pl.col(column) == value
             # Combine the expressions
-            print(expr)
             combined_expression &= expr
         
         return combined_expression
