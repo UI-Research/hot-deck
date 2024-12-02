@@ -1,3 +1,5 @@
 /.venv
 /build
 /src/hot_deck_imputer.egg-info
+/hotdeck
+/src/hot-deck-imputer/__pycache__
