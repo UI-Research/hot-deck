@@ -1,4 +1,4 @@
-from hot_deck_class import HotDeckImputer
+import hot_deck_imputer
 import polars as pl 
 
 if __name__ == '__main__':
