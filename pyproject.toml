@@ -44,11 +44,5 @@ dependencies = [
     "XlsxWriter == 3.2.0"
 ]
 
-[tool.setuptools]
-packages = ["find:"]
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
 [project.urls]
 Homepage = "https://github.com/UI-Research/hot-deck"
