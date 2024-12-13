@@ -358,7 +358,7 @@ class HotDeckImputer:
         """
         # Check if the column exists in the DataFrame
         if column_name not in data.columns:
-            raise ValueError(f"Column '{column_name}' does not exist in donor_data.")
+            raise ValueError(f"Column '{column_name}' does not exist in '{data}'.")
         
         # Calculate summary statistics
         summary_stats = {
