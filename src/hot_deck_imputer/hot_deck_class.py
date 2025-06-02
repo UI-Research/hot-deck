@@ -1,5 +1,6 @@
 """
 Class defining HotDeckImputer for imputing missing values in recipient data using donor data.
+
 """
 import numpy as np
 import polars as pl
@@ -98,7 +99,8 @@ class HotDeckImputer:
         # Create empty dictionary to store the partitions
         donor_cells = {}
         recipient_cells = {}
-        
+
+        # Remove the extra recipient_cells = statement
         for i, condition in enumerate(self.cell_definitions):
             # Create cell based on condition
             filter_expr = self._parse_condition(condition)
@@ -318,10 +320,11 @@ class HotDeckImputer:
             # Indicate to user that noise was not generated if all values are below the threshold
             if ge_thresh.sum() == 0:
                 print(f'\nCell:\n{condition}')
+                imputation_var_column = f'imp_{self.imputation_var}'
                 print(f'NO NOISE GENERATED for cell due to thresholding.\n' 
                         f'All values are below the threshold of {threshold}\n'
                         f'Mean value of cell observations for imp_{self.imputation_var}: ' 
-                        f'{recipient_cell[f'imp_{self.imputation_var}'].mean()}')
+                        f'{recipient_cell[imputation_var_column].mean()}')
 
             # Apply noise to the imputed liquid assets in the recipient cell
             recipient_cell = recipient_cell.with_columns(
