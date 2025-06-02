@@ -14,11 +14,11 @@ where = ["src"]
 
 [project]
 name = "hot_deck_imputer"
-version = "1.0.0"
+version = "1.0.1"
 description = "A package to conduct hot deck imputation methods over polars frames"
 authors = [{name = "Jameson Carter", email = "jamcarter@urban.org" }]
 readme = "README.md"
-requires-python = '>=3.12.4'
+requires-python = '>=3.10.9'
 license = { text = "MIT" }
 classifiers = [
     "Programming Language :: Python :: 3",
