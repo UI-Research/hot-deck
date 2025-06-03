@@ -439,7 +439,7 @@ class HotDeckImputer:
             if donor_cell is not None and not donor_cell.shape[0] == 0:
                 # Perform weighted random selection for the required number of values
                 if self.weight_var:
-                    weights = donor_cell[self.weight_var]
+                    weights = np.asarray(donor_cell[self.weight_var]).astype('float64')
                     donor_values = donor_cell[self.imputation_var].drop_nulls()
 
                     # Randomly select `missing_count` values from the donor set using the weights
