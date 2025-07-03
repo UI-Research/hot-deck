@@ -73,6 +73,12 @@ imputer.cell_definitions
 ```
 imputer.split_cell("race_cell == 'Black' & sex_cell == 'F'", "work_cell")
 ```
+
+### Collapse specific cells up where sample allows
+Collapses all conditions that start with `"race_cell == 'Black'"` into one bin. Updates `self.donor_cells`, `self.recipient_cells`, and `self.cell_definitions`. In this example, cells differentiated by work status and sex will be concatenated together for Black respondents.
+```
+imputer.collapse_cell(base_condition = "race_cell == 'Black'")
+```
 ### Impute data
 ```
 imputer.impute()
