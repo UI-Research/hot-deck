@@ -173,7 +173,53 @@ class HotDeckImputer:
         
         # Remove the original cell condition from cell definitions
         self.cell_definitions.remove(cell_condition)
+
+        print("Cell splitting completed successfully.")
+        print("To rerun with these cells submit imputer.impute() again.")
         return
+    
+def collapse_cell(self, base_condition: str):
+    """
+    Method to collapse multiple cells into a single cell based on a base condition.
+    :param base_condition: A condition string representing the base condition to identify cells to collapse.
+    :return: None
+    """
+    # Initialize combined donor and recipient data
+    combined_donor = None
+    combined_recipient = None
+
+    # Identify all matching cells in cell_definitions
+    matching_cells = [
+            condition for condition in self.cell_definitions
+            if base_condition in condition 
+        ]
+    
+    # Identify the conditions to be collapsed and repopulate concatenated recipient + donor data
+    for match in matching_cells:
+            if combined_donor is None:
+                combined_donor = self.donor_cells[match]
+                combined_recipient = self.recipient_cells[match]
+            else:
+                combined_donor = combined_donor.vstack(self.donor_cells[match])
+                combined_recipient = combined_recipient.vstack(self.recipient_cells[match])
+
+            # Remove the old cells from the donor and recipient cell data
+            del self.donor_cells[match]
+            del self.recipient_cells[match]
+
+            # Remove the old cell condition from cell definitions
+            self.cell_definitions.remove(match)
+
+    self.donor_cells[base_condition] = combined_donor
+    self.recipient_cells[base_condition] = combined_recipient
+
+    # Update cell definitions
+    self.cell_definitions.append(base_condition)
+
+    print("Cell collapsing completed successfully.")
+    print("To rerun with these cells submit imputer.impute() again.")
+    return
+
     
     def summarize_cells(self):
         results = {}
