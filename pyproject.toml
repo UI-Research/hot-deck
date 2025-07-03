@@ -28,7 +28,7 @@ classifiers = [
 dependencies = [
     "colorama == 0.4.6",
     "iniconfig == 2.0.0",
-    "numpy == 2.0.1",
+    "numpy == 1.26.4",
     "packaging == 24.1",
     "pandas == 2.2.2",
     "patsy == 1.0.1",
