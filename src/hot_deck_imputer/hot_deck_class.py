@@ -18,6 +18,10 @@ class HotDeckImputer:
         Initialize with the dataset. Donor data is the source for the hot deck.
         Recipient data is the dataset that will receive the imputation.
         """
+        # Anchor random seed
+        np.random.seed(42)
+        
+        # Set attributes for the class
         self.donor_data = donor_data.clone()
         self.imputation_var = imputation_var
         self.weight_var = weight_var
