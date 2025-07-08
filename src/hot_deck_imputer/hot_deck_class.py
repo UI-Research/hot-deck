@@ -13,19 +13,18 @@ import hot_deck_imputer.error_detection as error_detection
 class HotDeckImputer:
     def __init__(self, donor_data:pl.DataFrame, 
                  imputation_var:str, weight_var:str,
-                 recipient_data:pl.DataFrame):
+                 recipient_data:pl.DataFrame,
+                 random_seed:int = None):
         """
         Initialize with the dataset. Donor data is the source for the hot deck.
         Recipient data is the dataset that will receive the imputation.
         """
-        # Anchor random seed
-        np.random.seed(42)
-        
         # Set attributes for the class
         self.donor_data = donor_data.clone()
         self.imputation_var = imputation_var
         self.weight_var = weight_var
         self.recipient_data = recipient_data.clone()
+        self.random_seed = random_seed
 
         # Cell definition attributes to be defined in methods
         self.cell_definitions = None
@@ -485,7 +484,10 @@ class HotDeckImputer:
         # For each recipient cell, find the corresponding donor cell and perform imputation
         for condition, recipient_cell in self.recipient_cells.items():
             donor_cell = self.donor_cells.get(condition)
-            
+                    # Set the random seed if provided
+            if self.random_seed is not None:
+                np.random.seed(self.random_seed)
+
             if donor_cell is not None and not donor_cell.shape[0] == 0:
                 # Perform weighted random selection for the required number of values
                 if self.weight_var:
