@@ -470,10 +470,12 @@ class HotDeckImputer:
 
         return
 
-    def impute(self):
+    def impute(self, replace=True):
         """
         Impute the missing values in the recipient data using the donor data for corresponding cells.
         This method assumes that both donor and recipient data have been partitioned using generate_cells.
+        Parameters:
+            replace (bool): Whether sampling is with replacement (default True).
         """
         if not self.cell_definitions:
             raise ValueError("Cell definitions are not provided")
@@ -496,11 +498,11 @@ class HotDeckImputer:
 
                     # Randomly select `missing_count` values from the donor set using the weights
                     # Using weighted selection according to probability proportional to weights https://documentation.sas.com/doc/en/statcdc/14.2/statug/statug_surveyimpute_details25.htm#statug.surveyimpute.weightedDet
-                    selected_values = np.random.choice(donor_values, size=len(recipient_cell), replace=True, p=weights / weights.sum())
+                    selected_values = np.random.choice(donor_values, size=len(recipient_cell), replace=replace, p=weights / weights.sum())
                 else:
                     # Without weights, simply sample donor values
                     donor_values = donor_cell[self.imputation_var].drop_nulls()
-                    selected_values = np.random.choice(donor_values, size=len(recipient_cell), replace=True)
+                    selected_values = np.random.choice(donor_values, size=len(recipient_cell), replace=replace)
 
                 # Add the imputed values to the recipient cell
                 recipient_cell = recipient_cell.with_columns(
