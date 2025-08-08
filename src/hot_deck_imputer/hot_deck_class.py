@@ -1,6 +1,32 @@
 """
 Class defining HotDeckImputer for imputing missing values in recipient data using donor data.
 
+Hot deck imputation is a statistical method where missing values in a dataset
+are replaced with values from a similar donor dataset. This class provides
+methods for validating data, defining cells, and performing imputation.
+
+Attributes:
+- donor_data (pl.DataFrame): The source dataset for imputation.
+- recipient_data (pl.DataFrame): The dataset that will receive imputed values.
+- imputation_var (str): The variable to be imputed.
+- weight_var (str): The variable used for weighted sampling.
+- random_seed (int, optional): Seed for reproducibility of random operations.
+
+Methods:
+- generate_cells: Generates cells based on defined conditions.
+- define_cells: Defines all possible cell definitions based on input variables.
+- split_cell: Splits an individual cell based on a new condition.
+- collapse_cell: Collapses multiple cells into a single cell based on a base condition.
+- summarize_cells: Summarizes the imputation results for each cell.
+- gen_analysis_file: Generates an Excel file summarizing the imputation results.
+- apply_random_noise: Applies random noise to the imputed values to smooth out clustering issues.
+- summarize_column: Summarizes a column in the data, returning basic statistics.
+- age_dollar_amounts: Ages the imputed values to a target year using CPI indexes.
+
+Hidden Methods:
+- _validate_data: Validates the input data and parameters.
+- _check_variable_consistency: Checks if the unique values and types of variables are consistent across datasets.
+- _parse_condition: Parses a condition string and returns a Polars expression.
 """
 import numpy as np
 import polars as pl
@@ -16,8 +42,17 @@ class HotDeckImputer:
                  recipient_data:pl.DataFrame,
                  random_seed:int = None):
         """
-        Initialize with the dataset. Donor data is the source for the hot deck.
-        Recipient data is the dataset that will receive the imputation.
+        Initialize the HotDeckImputer class with donor and recipient datasets.
+
+        Parameters:
+        - donor_data (pl.DataFrame): The dataset providing values for imputation.
+        - imputation_var (str): The variable to be imputed.
+        - weight_var (str): The variable used for weighted sampling.
+        - recipient_data (pl.DataFrame): The dataset receiving the imputed values.
+        - random_seed (int, optional): Seed for random number generation to ensure reproducibility.
+
+        Notes:
+        - The donor and recipient data are cloned to avoid modifying the original datasets.
         """
         # Set attributes for the class
         self.donor_data = donor_data.clone()
