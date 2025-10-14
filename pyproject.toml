@@ -30,7 +30,7 @@ dependencies = [
     "iniconfig == 2.0.0",
     "numpy >= 1.26.4",
     "packaging == 24.1",
-    "pandas == 2.2.2",
+    "pandas >= 2.2.2",
     "patsy == 1.0.1",
     "pluggy == 1.5.0",
     "polars == 1.16.0",
