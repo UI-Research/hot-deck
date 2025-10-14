@@ -14,7 +14,7 @@ where = ["src"]
 
 [project]
 name = "hot_deck_imputer"
-version = "1.0.3"
+version = "1.0.4"
 description = "A package to conduct hot deck imputation methods over polars frames"
 authors = [{name = "Jameson Carter", email = "jamcarter@urban.org" }]
 readme = "README.md"

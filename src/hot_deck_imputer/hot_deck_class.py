@@ -505,12 +505,13 @@ class HotDeckImputer:
 
         return
 
-    def impute(self, replace=True):
+    def impute(self, replace=True, additional_vars = []):
         """
         Impute the missing values in the recipient data using the donor data for corresponding cells.
         This method assumes that both donor and recipient data have been partitioned using generate_cells.
         Parameters:
             replace (bool): Whether sampling is with replacement (default True).
+            additional_vars (list): List of additional variables to pull from donors in the imputation. 
         """
         if not self.cell_definitions:
             raise ValueError("Cell definitions are not provided")
@@ -529,20 +530,33 @@ class HotDeckImputer:
                 # Perform weighted random selection for the required number of values
                 if self.weight_var:
                     weights = np.asarray(donor_cell[self.weight_var]).astype('float64')
-                    donor_values = donor_cell[self.imputation_var].drop_nulls()
-
+    
                     # Randomly select `missing_count` values from the donor set using the weights
                     # Using weighted selection according to probability proportional to weights https://documentation.sas.com/doc/en/statcdc/14.2/statug/statug_surveyimpute_details25.htm#statug.surveyimpute.weightedDet
-                    selected_values = np.random.choice(donor_values, size=len(recipient_cell), replace=replace, p=weights / weights.sum())
+                    selected_indices = np.random.choice(np.arange(donor_cell.shape[0]), size=len(recipient_cell), replace=replace, p=weights / weights.sum())
+
                 else:
                     # Without weights, simply sample donor values
-                    donor_values = donor_cell[self.imputation_var].drop_nulls()
-                    selected_values = np.random.choice(donor_values, size=len(recipient_cell), replace=replace)
+                    selected_indices = np.random.choice(np.arange(donor_cell.shape[0]), size=len(recipient_cell), replace=replace)
+                    
+                # After getting the indices, extract the target variable value and, if there are additional variables, extract those as well
+                selected_values = donor_cell[selected_indices]
 
                 # Add the imputed values to the recipient cell
                 recipient_cell = recipient_cell.with_columns(
-                    pl.Series(f'imp_{self.imputation_var}', selected_values)
+                    pl.Series(f'imp_{self.imputation_var}', selected_values[self.imputation_var])
                 )
+
+                # Extract and add the imputed values for additional variables
+                for var in additional_vars:
+                    if var in donor_cell.columns:
+                        selected_values = donor_cell[selected_indices][var]
+                        recipient_cell = recipient_cell.with_columns(
+                            pl.Series(f'imp_{var}', selected_values)
+                        )
+                    else:
+                        print(f"Warning: Variable '{var}' not found in donor data. Skipping.")
+
                 # Add the imputed recipient cell to the list
                 imputed_recipient_cells.append(recipient_cell)
                 self.recipient_cells[condition] = recipient_cell.clone()
@@ -552,7 +566,8 @@ class HotDeckImputer:
                 print(f"No donors available for {condition}, global mean applied")
                 recipient_cell[f'imp_{self.imputation_var}'] = np.average(self.donor_data[self.imputation_var], 
                                                                           self.donor_data[self.weight_var])
-
+                # Skip additional_vars since there are no donor cells
+                print(f"Skipping additional_vars for {condition} as no donor cells are available.")
                 # Add the imputed recipient cell to the list
                 imputed_recipient_cells.append(recipient_cell)
                 self.recipient_cell = recipient_cell.clone()
