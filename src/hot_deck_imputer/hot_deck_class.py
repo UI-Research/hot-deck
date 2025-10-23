@@ -571,6 +571,13 @@ class HotDeckImputer:
                                                                                             )   
                 # Skip additional_vars since there are no donor cells
                 print(f"Skipping additional_vars for {condition} as no donor cells are available.")
+                for var in additional_vars:
+                    if var in donor_cell.columns:
+                        recipient_cell = recipient_cell.with_columns(
+                            pl.lit('NA').alias(f'imp_{var}')
+                        )
+                    else:
+                        print(f"Warning: Variable '{var}' not found in donor data. Skipping.")
                 # Add the imputed recipient cell to the list
                 imputed_recipient_cells.append(recipient_cell)
                 self.recipient_cell = recipient_cell.clone()
