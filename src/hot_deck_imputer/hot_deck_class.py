@@ -578,7 +578,7 @@ class HotDeckImputer:
                         print(f"Warning: Variable '{var}' not found in donor data. Skipping.")
                 # Add the imputed recipient cell to the list
                 imputed_recipient_cells.append(recipient_cell)
-                self.recipient_cell = recipient_cell.clone()
+                self.recipient_cells[condition] = recipient_cell.clone()
 
         # Combine all the imputed recipient cells into one DataFrame
         self.recipient_data = pl.concat(imputed_recipient_cells)
