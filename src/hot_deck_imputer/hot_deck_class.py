@@ -581,6 +581,9 @@ class HotDeckImputer:
                 # Add the imputed recipient cell to the list
                 imputed_recipient_cells.append(recipient_cell)
                 self.recipient_cell = recipient_cell.clone()
+        
+        for item in imputed_recipient_cells:
+            print(item)
 
         # Combine all the imputed recipient cells into one DataFrame
         self.recipient_data = pl.concat(imputed_recipient_cells)
