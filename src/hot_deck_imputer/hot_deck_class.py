@@ -564,8 +564,11 @@ class HotDeckImputer:
             else:
                 # If no donors are available, imputation is not performed (or can apply other fallback logic here)
                 print(f"No donors available for {condition}, global mean applied")
-                recipient_cell[f'imp_{self.imputation_var}'] = np.average(self.donor_data[self.imputation_var], 
-                                                                          weights = self.donor_data[self.weight_var])
+                recipient_cell = recipient_cell.with_columns(
+                    pl.lit(np.average(self.donor_data[self.imputation_var], 
+                                      weights=self.donor_data[self.weight_var])
+                            ).alias(f'imp_{self.imputation_var}')
+                                                                                            )   
                 # Skip additional_vars since there are no donor cells
                 print(f"Skipping additional_vars for {condition} as no donor cells are available.")
                 # Add the imputed recipient cell to the list
