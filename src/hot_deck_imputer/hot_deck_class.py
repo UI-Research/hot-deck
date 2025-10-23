@@ -339,7 +339,7 @@ class HotDeckImputer:
         col = 0
 
         # Iterate through each cell's data
-        with Workbook(full_path) as wb:  
+        with Workbook(full_path, {'nan_inf_to_errors': True}) as wb:  
             ws = wb.add_worksheet('Summary')
             for key, df in data.items():
                 ws.write(row-1, col, key)
