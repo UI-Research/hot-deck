@@ -574,7 +574,7 @@ class HotDeckImputer:
                 for var in additional_vars:
                     if var in donor_cell.columns:
                         recipient_cell = recipient_cell.with_columns(
-                            pl.lit('NA').alias(f'imp_{var}')
+                            pl.lit(None).alias(f'imp_{var}')
                         )
                     else:
                         print(f"Warning: Variable '{var}' not found in donor data. Skipping.")
