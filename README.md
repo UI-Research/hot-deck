@@ -86,7 +86,7 @@ Sampling with replacement is the default, note you cannot sample without replace
 ```
 imputer.impute(replace = True)
 ```
-Alternatively, you can supply a list of additional vars to bring along, which preserves the joint distribution of variables brought along the core imputation variable targeted.
+Alternatively, you can supply a list of additional vars to bring along, which preserves the joint distribution of variables brought along with the core imputation variable targeted.
 ```
 imputer.impute(replace = True, additional_vars = ['nonliquid_assets'])
 ```
