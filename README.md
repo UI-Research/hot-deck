@@ -19,6 +19,8 @@ from hot_deck_class import HotDeckImputer
 donor_data = {
     'assets': [50000, 20000, 300000, 2000, 
                      10000, 10000, 200, 2000, 4000, 500000],
+    'nonliquid_assets': [1000, 2500, 4300, 2000, 
+                     6002, 5560, 2005, 0, 400, 10000],
     'race_cell': ['Black','Black','Black','White','White',
                      'White','Black','White','Black','Black'],
     'sex_cell': ['M','F','F','M','F',
@@ -80,8 +82,13 @@ Collapses all conditions that start with `"race_cell == 'Black'"` into one bin. 
 imputer.collapse_cell(base_condition = "race_cell == 'Black'")
 ```
 ### Impute data
+Sampling with replacement is the default, note you cannot sample without replacement if donor cells are smaller than recipient cells.
 ```
-imputer.impute()
+imputer.impute(replace = True)
+```
+Alternatively, you can supply a list of additional vars to bring along, which preserves the joint distribution of variables brought along the core imputation variable targeted.
+```
+imputer.impute(replace = True, additional_vars = ['nonliquid_assets'])
 ```
 ### Add random noise to smooth the results
 ```
