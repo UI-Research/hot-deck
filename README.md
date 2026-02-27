@@ -1,7 +1,7 @@
 ## About
-This repo contains Python code that implements hot deck imputation using Polars dataframes. It generalizes methods that are possible
+This repo contains Python code that implements hot deck imputation using Polars dataframes.
 
-Hot deck imputation involves randomly sampling individuals to create data for rows missing information. In many microsimulation settings at Urban, this concept is applied across datasets as well, where information missing in one dataset is inferred from another dataset. The basic process is as follows:
+Hot deck imputation involves randomly sampling individuals to create data for missing information. In many microsimulation settings at Urban, this concept is applied across datasets, where information missing in one dataset is inferred from another dataset. The basic process is as follows:
 
 * Define categorical cells that are avaialable in both datasets, for example race.
 * Divide the data into categories available in donor and source data.
