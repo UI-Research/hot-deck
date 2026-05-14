@@ -35,7 +35,6 @@ dependencies = [
     "polars == 1.16.0",
     "python-dateutil == 2.9.0.post0",
     "pytz == 2024.1",
-    "scipy == 1.14.1",
     "six == 1.16.0",
     "statsmodels == 0.14.4",
     "tzdata == 2024.1",
